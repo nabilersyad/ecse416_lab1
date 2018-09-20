@@ -11,6 +11,7 @@ package lab1;
 import java.io.*;
 import java.net.*;
 import java.util.Arrays;
+import java.util.Random;
 import java.nio.ByteBuffer;
 
 public class DnsClient {
@@ -30,7 +31,7 @@ public class DnsClient {
 		DatagramSocket clientSocket = new DatagramSocket();
 		
 		
-		// Allocate buffers for the data to be sent and received
+		// Allocate packfers for the data to be sent and received
 		byte[] sendData = new byte[1024];		
 		byte[] receiveData = new byte[1024];
 
@@ -39,15 +40,12 @@ public class DnsClient {
 		
 		System.out.println("Enter IP address");
 		
-		args[0] = inFromUser.readLine();
+		//args[0] = inFromUser.readLine();
 		System.out.println(args[0]);
 		
 		byte[] IP = parseIP(args[0]);
 		
-		System.out.println(IP[0]&0xFF);
-		System.out.println(IP[1]&0xFF);
-		System.out.println(IP[2]);
-		System.out.println(IP[3]);
+		
 		InetAddress ipAddress = InetAddress.getByAddress(IP);
 	     //Returns an InetAddress object given the raw IP address . The argument is in network byte order: the highest order byte of the address is in getAddress()[0].
 		
@@ -56,27 +54,25 @@ public class DnsClient {
 		//second args is domain name
 		
 		System.out.println("Enter Domain Name");
-		args[1] = inFromUser.readLine();
+		//args[1] = inFromUser.readLine();
 		//System.out.println(args[1]);
 		
 		String sentence = args[0] + " " + args[1];
+		
+		// REMEMBER TO WRITE CODE TO DETERMINE args with if statements for other arguments
 		
 		System.out.println(sentence);
 		
 		/// HERE I THINK SEND DATA SHOULD BE THE IN THE DNS PACKET FORMAT. 
 		
 		//sendData = sentence.getBytes();
-		sendData = packetHeader();
-		System.out.println(sendData[0]);
-		System.out.println(sendData[1]);
-		System.out.println(sendData[2]);
-		System.out.println(sendData[3]);
-		System.out.println(sendData[4]);
-		System.out.println(sendData[5]);
-		System.out.println(sendData[6]);
-		//System.out.println(Arrays.toString(sendData));
-		System.out.println(51);
+		sendData = packetHeader(args[1],args[2]);
 		
+		for(int i = 0; i<sendData.length;i++) {
+			System.out.println(sendData[i]);
+		}
+		
+		//System.out.println(Arrays.toString(sendData));
 		
 		
 		// Create a UDP packet to be sent to the server
@@ -87,6 +83,10 @@ public class DnsClient {
 		// Send the packet
 		clientSocket.send(sendPacket);
 		System.out.println(59);
+		
+		
+		
+		
 		// Create a packet structure to store data sent back by the server
 		DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
 		System.out.println(62);
@@ -121,7 +121,7 @@ public class DnsClient {
 	}
 	
 	// have to create methods that will call create a packet header
-	public static byte[] packetHeader() {
+	public static byte[] packetHeader(String  domainName, String qtype) {
 		
 		// DNS PACKET HEADER for query
 				/* 
@@ -143,49 +143,104 @@ public class DnsClient {
 				// ID
 		
 		
-		ByteBuffer buf = ByteBuffer.allocate(512);	//creates space in byte buffer for 512 byte[] array
-		byte ID1 = (byte)Math.random();				//Creates ID for field 1
-		byte ID2 = (byte)Math.random();				//creates ID
-		
+		byte[] pack = new byte[512];	//creates space in byte packfer for 512 byte[] array
+
+		byte[] ID = new byte[2];				//Creates ID for field 1
+		new Random().nextBytes(ID);
 		// ID field = xxxxxxxx xxxxxxxx - in 2 bytes
-		buf.put(0, ID1);
-		buf.put(1, ID2);
+		pack[0] = ID[0];
+		//System.out.println(ID[0] + "ID1"); 
+		pack[1] = ID[1];
+		//System.out.println(ID[1] + "ID2"); 
 		
 		////QR OPcode AA TC RD = line2_1 = 1 -- 00000001 - in byte
 		byte line2_1 = 1;
-		buf.put(2, line2_1);
+		pack[2] = line2_1;
 		
 		//Z and Rcode == line2_2 = 0 -- 00000000 in byte
 		byte line2_2 = 0;
-		buf.put(3,line2_2);
+		pack[3] = line2_2;
 		
 		//QDcount = 1 -- 00000000 00000001 in byte
 		byte QDCOUNT1 = 0;
 		byte QDCOUNT2 = 1;
-		buf.put(4, QDCOUNT1);
-		buf.put(5, QDCOUNT2);
+		pack[4] = QDCOUNT1;
+		pack[5] = QDCOUNT2;
 		
 		//ANCOUNT =0 - 00000000 00000000
 		byte ANCOUNT = 0;
-		buf.put(6, ANCOUNT);
-		buf.put(7, ANCOUNT);
+		pack[6] = ANCOUNT;
+		pack[7] = ANCOUNT;
 		
 		
 		//NSCOUNT = 0 - 000000000 00000000
 		byte NSCOUNT = 0;
-		buf.put(8, NSCOUNT);
-		buf.put(9, NSCOUNT);
+		pack[8]= NSCOUNT;
+		pack[9]= NSCOUNT;
 		
 		//ARCOUNT 00000000 00000000
 		byte ARCOUNT = 0;
-		buf.put(10, ARCOUNT);
-		buf.put(11, ARCOUNT);
+		pack [10]= ARCOUNT;
+		pack [11] = ARCOUNT;
 		
 		
-		byte[] x = new byte[1];
-		buf.put(x);
 		
-		return x;
+		
+		// DNS Questions
+		
+		//Qname field 
+		String [] labels = domainName.split("\\.");
+		System.out.println(labels[0]); //www
+		System.out.println(labels[1]); //mcgill
+		System.out.println(labels[2]); //ca
+		
+		int qLocation = 12;    //location of start of qname field
+		for (int i=0; i<labels.length;i++){
+			pack[qLocation++] = ((byte)labels[i].length());
+			//System.out.println(pack[qLocation]);
+			//System.out.println("outer loop");
+			
+			for (int j=0; j<labels[i].length(); j++){
+				byte domainByte = (byte)labels[i].charAt(j);
+				pack[qLocation++]= domainByte;
+				//System.out.println("inner loop");
+				//System.out.println(pack[qLocation]);
+			}	
+
+		}		
+		System.out.println(qLocation + " nombor berapa");
+		
+		byte endQName = 0;					// marking end of Qname
+		pack [qLocation++] = endQName ;
+		
+		// Qtype
+		byte qtype1 = 0;
+		pack [qLocation++] = qtype1;
+		
+		byte A = 1;
+		byte NS = 2;
+		byte MX = 15;
+		
+		if(qtype.equals("A")) {
+			pack [qLocation++] = A;
+			
+		}
+		
+		else if(qtype.equals("NS")) {
+			pack [qLocation++] = NS;
+			
+		}
+		else if(qtype.equals("MX")) {
+			pack [qLocation++] = MX;
+			
+		}
+		
+		//qclass
+		
+		pack [qLocation++] = 0;
+		pack [qLocation++] = 1;
+		
+		return pack;
 	}
 	
 	//just a comment line to test github branch
