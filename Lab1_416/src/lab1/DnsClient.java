@@ -16,13 +16,75 @@ import java.nio.ByteBuffer;
 
 public class DnsClient {
 	
-	
-	
 
 	public static void main(String args[]) throws Exception{
 		
 		
 		int port = 53;
+		int timeOut = 5;
+		int maxRetry = 3;
+		int atSign = 0;
+		String domainName = "";
+		String queueType = "";
+		String IPstring[] = {"","","","",};
+		//int IPadd[] = new int[4];
+		int next = 0;
+	
+		try {
+			for (int k = 0; k < args.length; k++) {
+				char[] bitsArgs = args[k].toCharArray(); 			
+				for (int m = 0; m < bitsArgs.length; m++) {						
+					if (bitsArgs[m] == '@') {
+						domainName = args[k+1]; 
+						atSign++;
+					}					
+					else if (bitsArgs[m] == '.') 
+						next++ ;
+					
+					else if (bitsArgs[m] != '@' && Character.isDigit(bitsArgs[m]) && atSign == 1) 
+						IPstring[next] += bitsArgs[m];
+					
+					else if (bitsArgs[m] == '-'){
+						if (bitsArgs[m+1] == 't') {
+							timeOut = Integer.parseInt(args[k+1]);
+							if (timeOut == 0){
+								System.out.println("Error. timeOut value needs to be greater than 0");
+							}
+						}
+						if (bitsArgs[m+1] == 'r') {
+							maxRetry = Integer.parseInt(args[k+1]);
+						}
+						if (bitsArgs[m+1] == 'p') {
+
+							port = Integer.parseInt(args[k+1]);
+						}
+
+						if (bitsArgs[m+1] == 'm' && bitsArgs[m+2] == 'x')
+							queueType = "MX";
+							
+						if (bitsArgs[m+1] == 'n' && bitsArgs[m+2] == 's')
+							queueType = "NS";
+					}
+				}	
+			}
+				
+				if (atSign == 0) {
+					System.out.println("Error. IP address is not correct. You are missing an '@'");
+					System.exit(1);
+				}
+			
+				
+				if (atSign >1) {
+					System.out.println("Error. Only enter one '@'");
+				}
+		}
+		
+		catch (ArrayIndexOutOfBoundsException e) 
+		{
+			System.out.println("Error. Please input the correct format of domain name or an IP address");
+			System.exit(1);
+		}
+				
 		// Open a reader to input from the command line
 		BufferedReader inFromUser = new BufferedReader(new InputStreamReader(System.in));
 
@@ -38,35 +100,47 @@ public class DnsClient {
 		// User inputs query in the format required
 		/////////
 		
-		System.out.println("Enter IP address");
+		//System.out.println("Enter IP address");
 		
 		//args[0] = inFromUser.readLine();
-		System.out.println(args[0]);
+		//System.out.println(args[0]);
 		
-		byte[] IP = parseIP(args[0]);
+		// have problem with the line below
+		// this only considers if IP address is on the first entry
+		//byte[] IP = parseIP(args[0]);
+		
+		//new changes
+		int ipEntry [] = new int[4];
+		ipEntry[0] = Integer.parseInt(IPstring[0]);
+		ipEntry[1] = Integer.parseInt(IPstring[1]);
+		ipEntry[2] = Integer.parseInt(IPstring[2]);
+		ipEntry[3] = Integer.parseInt(IPstring[3]);
+		
+		byte[] ipAddress = new byte [] {(byte) ipEntry[0],(byte) ipEntry[1], (byte) ipEntry[2], (byte) ipEntry[3]};
 		
 		
-		InetAddress ipAddress = InetAddress.getByAddress(IP);
+		
+		InetAddress IPserver = InetAddress.getByAddress(ipAddress);
 	     //Returns an InetAddress object given the raw IP address . The argument is in network byte order: the highest order byte of the address is in getAddress()[0].
 		
-		System.out.println("line 50");
+		//System.out.println("line 50");
 		
 		//second args is domain name
 		
-		System.out.println("Enter Domain Name");
+		//System.out.println("Enter Domain Name");
 		//args[1] = inFromUser.readLine();
 		//System.out.println(args[1]);
 		
-		String sentence = args[0] + " " + args[1];
+		//String sentence = args[0] + " " + args[1];
 		
-		// REMEMBER TO WRITE CODE TO DETERMINE args with if statements for other arguments
+		// DONE! REMEMBER TO WRITE CODE TO DETERMINE args with if statements for other arguments
 		
-		System.out.println(sentence);
+		//System.out.println(sentence);
 		
 		/// HERE I THINK SEND DATA SHOULD BE THE IN THE DNS PACKET FORMAT. 
 		
 		//sendData = sentence.getBytes();
-		sendData = packetHeader(args[1],args[2]);
+		sendData = packetHeader(domainName,queueType);
 		
 		for(int i = 0; i<sendData.length;i++) {
 			System.out.println(sendData[i]);
@@ -78,7 +152,7 @@ public class DnsClient {
 		// Create a UDP packet to be sent to the server
 		// This involves specifying the sender's address and port number
 		//DatagramPacket(byte[] data to send,array data length,IPaddress,port number)
-		DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, ipAddress, port);
+		DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, IPserver, port);
 		System.out.println(56);
 		// Send the packet
 		clientSocket.send(sendPacket);
@@ -99,7 +173,9 @@ public class DnsClient {
 		
 		// Close the socket
 		clientSocket.close();
-	}
+			}
+		
+	
 	
 	
 	public static byte[] parseIP(String in) {
