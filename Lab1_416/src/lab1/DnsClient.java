@@ -1,10 +1,5 @@
 package lab1;
 /**
- * UDPClient
- * 
- * Adapted from the example given in Section 2.8 of Kurose and Ross, Computer
- * Networking: A Top-Down Approach (5th edition)
- * 
  * @author michaelrabbat
  * 
  */
@@ -25,7 +20,7 @@ public class DnsClient {
 		int maxRetry = 3;
 		int atSign = 0;
 		String domainName = "";
-		String queueType = "";
+		String queueType = "A"; 			// by default A unless user input something else
 		String IPstring[] = {"","","","",};
 		//int IPadd[] = new int[4];
 		int next = 0;
@@ -47,9 +42,6 @@ public class DnsClient {
 					else if (bitsArgs[m] == '-'){
 						if (bitsArgs[m+1] == 't') {
 							timeOut = Integer.parseInt(args[k+1]);
-							if (timeOut == 0){
-								System.out.println("Error. timeOut value needs to be greater than 0");
-							}
 						}
 						if (bitsArgs[m+1] == 'r') {
 							maxRetry = Integer.parseInt(args[k+1]);
@@ -69,45 +61,39 @@ public class DnsClient {
 			}
 				
 				if (atSign == 0) {
-					System.out.println("Error. IP address is not correct. You are missing an '@'");
+					System.out.println("ERROR	IP address is not correct. You are missing an '@'");
 					System.exit(1);
 				}
 			
 				
 				if (atSign >1) {
-					System.out.println("Error. Only enter one '@'");
+					System.out.println("ERROR	Only enter one '@'");
+					System.exit(1);
+				}
+				
+				if (timeOut == 0){
+					System.out.println("ERROR	timeOut value needs to be greater than 0");
+					System.exit(1);
 				}
 		}
 		
 		catch (ArrayIndexOutOfBoundsException e) 
 		{
-			System.out.println("Error. Please input the correct format of domain name or an IP address");
+			System.out.println("ERROR	Please input the correct format of domain name or an IP address");
 			System.exit(1);
 		}
-				
-		// Open a reader to input from the command line
-		BufferedReader inFromUser = new BufferedReader(new InputStreamReader(System.in));
 
 		// Create a UDP socket
 		// (Note, when no port number is specified, the OS will assign an arbitrary one)
 		DatagramSocket clientSocket = new DatagramSocket();
 		
 		
-		// Allocate packfers for the data to be sent and received
+		// Allocate buffers for the data to be sent and received
 		byte[] sendData = new byte[1024];		
 		byte[] receiveData = new byte[1024];
 
-		// User inputs query in the format required
-		/////////
 		
-		//System.out.println("Enter IP address");
 		
-		//args[0] = inFromUser.readLine();
-		//System.out.println(args[0]);
-		
-		// have problem with the line below
-		// this only considers if IP address is on the first entry
-		//byte[] IP = parseIP(args[0]);
 		
 		//new changes
 		int ipEntry [] = new int[4];
@@ -132,30 +118,32 @@ public class DnsClient {
 		//System.out.println(args[1]);
 		
 		//String sentence = args[0] + " " + args[1];
-		
-		// DONE! REMEMBER TO WRITE CODE TO DETERMINE args with if statements for other arguments
-		
-		//System.out.println(sentence);
-		
-		/// HERE I THINK SEND DATA SHOULD BE THE IN THE DNS PACKET FORMAT. 
+
 		
 		//sendData = sentence.getBytes();
 		sendData = packetHeader(domainName,queueType);
-		
-		for(int i = 0; i<sendData.length;i++) {
-			System.out.println(sendData[i]);
-		}
-		
-		//System.out.println(Arrays.toString(sendData));
 		
 		
 		// Create a UDP packet to be sent to the server
 		// This involves specifying the sender's address and port number
 		//DatagramPacket(byte[] data to send,array data length,IPaddress,port number)
 		DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, IPserver, port);
-		System.out.println(56);
+		
+		
 		// Send the packet
 		clientSocket.send(sendPacket);
+		// timer start after sending data and retry tracker
+		long startTime = System.nanoTime();
+		int retry = 0;
+		System.out.println(startTime);
+		//if time to response exceeds timeout, will enter if statement and resend data
+		if((System.nanoTime()-startTime)/1000000000 >= timeOut) {		
+			retry++;
+			sendData = packetHeader(domainName,queueType);
+			System.out.println("timeout");
+			System.out.println(startTime);
+					
+		}
 		System.out.println(59);
 		
 		
@@ -166,10 +154,37 @@ public class DnsClient {
 		System.out.println(62);
 		// Receive data from the server
 		clientSocket.receive(receivePacket);
-		System.out.println(65);
-		// Extract the sentence (as a String object) from the received byte stream
-		String modifiedSentence = new String(receivePacket.getData());
-		System.out.println("From Server: " + modifiedSentence);
+		
+		String ansRecords = answerRecords(receiveData); 
+		System.out.println(ansRecords);
+		
+		String finaldata = Arrays.toString(receiveData);
+		System.out.println(finaldata);
+		String type = dataType(receiveData);
+		System.out.println(type);
+		
+		String cache = cacheTTL(receiveData);
+		System.out.println(cache);
+		
+		String AA = autho(receiveData);
+		System.out.println(AA);
+		
+		String addRecords = additionalRecords(receiveData); 
+		System.out.println(addRecords);
+		
+		
+		long endTime = System.currentTimeMillis();
+		startTime = startTime/1000;
+		endTime = endTime/1000;
+	
+		
+		System.out.println("Dns client sending request for "+ domainName);
+		System.out.println("Server: " + IPstring[0]+"." +IPstring[1]+"." +IPstring[2]+"."+IPstring[3]);
+		System.out.println("Request Type: " + queueType);
+		
+		System.out.println("\n"+ "Response received after " + ((long)(endTime - startTime))/1000 + " seconds" +" ("+retry +") retries");
+		
+
 		
 		// Close the socket
 		clientSocket.close();
@@ -214,14 +229,13 @@ public class DnsClient {
 				      ANCOUNT	16 bits 	0                    
 				      NSCOUNT   16 bits		0 ignore                 
 				      ARCOUNT   16 bits     0   */   
-
-				
 				// ID
 		
 		
 		byte[] pack = new byte[512];	//creates space in byte packfer for 512 byte[] array
 
-		byte[] ID = new byte[2];				//Creates ID for field 1
+		//ID field contains 2 bytes
+		byte[] ID = new byte[2];				
 		new Random().nextBytes(ID);
 		// ID field = xxxxxxxx xxxxxxxx - in 2 bytes
 		pack[0] = ID[0];
@@ -229,7 +243,7 @@ public class DnsClient {
 		pack[1] = ID[1];
 		//System.out.println(ID[1] + "ID2"); 
 		
-		////QR OPcode AA TC RD = line2_1 = 1 -- 00000001 - in byte
+		////QR OPcode AA TC RD = line2_1 = 1 -- 00000001 - in byte   00000x00
 		byte line2_1 = 1;
 		pack[2] = line2_1;
 		
@@ -318,9 +332,103 @@ public class DnsClient {
 		
 		return pack;
 	}
+	public static String dataType(byte [] receive) {
+		int nameStart = 12;
+		String type ="";
+		while((receive[nameStart] != 0)) {
+			nameStart++;	
+		}
+		nameStart= nameStart +2;
+		if((receive[nameStart] == 1)) {
+			type = "A";
+			
+		}
+		
+		else if((receive[nameStart] == 2)) {
+			type = "NS";
+			
+		}
+		else if((receive[nameStart] == 15)) {
+			type = "MX";
+			
+		}
+		else if((receive[nameStart] == 5)) {
+			type = "CNAME";
+			
+		}
+		
+		
+		return type;
+	}
 	
-	//just a comment line to test github branch
-	//ID field contains 2 bytes. thus occupy byte array spots
+	public static String cacheTTL(byte [] receive) {
+		int nameStart = 12;
+		String cache ="";
+		while((receive[nameStart] != 0)) {
+			nameStart++;	
+		}
+		nameStart= nameStart +5;   // to get to array with TLL
+		byte [] TTL = new byte[4];
+		TTL[0] = (byte) (receive[nameStart] & 0xFF);
+		TTL[1] = (byte) (receive[nameStart+1] & 0xFF);
+		TTL[2] = (byte) (receive[nameStart+2] & 0xFF);
+		TTL[3] = (byte) (receive[nameStart+3] & 0xFF);
+		cache = ""+TTL[0]+""+TTL[1]+""+TTL[2]+""+TTL[3];
+		return cache;
+	}
 	// have to use bit manipulation techniques to change values
-	//dns query size should be 62 bytes	
+	public static String autho(byte [] receive) {
+		int authostart = 3;
+		byte x = receive[authostart];
+		String autho = byteToBin(x);
+		char AA = autho.charAt(5);
+		//System.out.println(AA);
+		if(AA == '0') {
+			autho = "non-authoritative";
+
+		}
+		
+		if(AA == '1') {
+			autho = "authoritative";
+
+		}
+		
+		return autho;
+	}
+	public static String answerRecords(byte [] receive) {
+		int recordArray = 7;
+		byte x = receive[recordArray];
+		String number = ""+x;
+		
+		return number;
+	}
+	
+	public static String additionalRecords(byte [] receive) {
+		int recordArray = 11;
+		String number = "";
+		byte x = receive[recordArray];
+		if(x == 0) {
+			number = "NOTFOUND";
+			return number;
+		}
+		number = ""+x;
+		
+		return number;
+	}
+	
+	public static String byteToBin(byte byteIn) {
+    	String binOut = "";
+    	if (byteIn < 0) {
+    		int intIn = byteIn;
+    		intIn = intIn + 256;  
+    		binOut = String.format("%8s", Integer.toBinaryString(intIn & 0xFF)).replace(' ', '0');
+    	}
+    	else {
+        	binOut = String.format("%8s", Integer.toBinaryString(byteIn & 0xFF)).replace(' ', '0');
+    	}
+    	return binOut;
+    }
+		
+	
+	
 }
