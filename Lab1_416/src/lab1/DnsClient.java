@@ -135,8 +135,9 @@ public class DnsClient {
 		
 		String finaldata = Arrays.toString(receiveData);
 		System.out.println(finaldata);
-		String type = dataType(receiveData);
-		System.out.println(type);
+		String []data_type = dataType(receiveData);
+		String type = data_type[0];
+		String data = data_type[1];
 		
 		String cache = cacheTTL(receiveData);
 		System.out.println(cache);
@@ -161,8 +162,10 @@ public class DnsClient {
 		
 		System.out.println("\n" + "***Answer Section ("+ansRecords +" records)***");
 		
-		//System.out.println("IP" + "\t" +); //need to add IP adress from packet
-
+		if(type.equals("A")){		
+			System.out.println("IP" + "\t" +data +"\t" + cache + "\t" +AA); //need to add IP adress from packet
+		}
+		
 		
 		// Close the socket
 		clientSocket.close();
@@ -290,19 +293,33 @@ public class DnsClient {
 		return pack;
 	}
 	
-	
-	public static String dataType(byte [] receive) {
+	// method to determine data type and also the data in the answer in the response method
+	public static String[] dataType(byte [] receive) {
 		int nameStart = 12;
 		String type ="";
-		while((receive[nameStart] != 0)) {
-			nameStart++;	
-		}
-		nameStart= nameStart +2;
-		if((receive[nameStart] == 1)) {
-			type = "A";
-			
-		}
+		String data = "";
+		String output [] = {(type),(data)};
 		
+		// while loop to cycle through name in packet until end of domain name
+		while((receive[nameStart] != 0)) {
+			nameStart++;			
+		}
+		//offset by 8 to get to location of type field
+		nameStart= nameStart +8;			
+		if((receive[nameStart] == 1)) {
+			type = "A";	
+			nameStart = nameStart+9;	//offset to location of RData
+			int i =1;
+			while(i<5) {
+				data = data + (0xFF &receive[nameStart]);
+				System.out.println(receive[nameStart]);
+				nameStart++;
+				i++;
+				if(i<5) {
+					data = data + ".";
+				}
+			}	
+		}
 		else if((receive[nameStart] == 2)) {
 			type = "NS";
 			
@@ -315,9 +332,11 @@ public class DnsClient {
 			type = "CNAME";
 			
 		}
+		output[0] = type;
+		output[1] = data;
 		
 		
-		return type;
+		return output;
 	}
 	
 	public static String cacheTTL(byte [] receive) {
@@ -388,3 +407,4 @@ public class DnsClient {
     	return binOut;
     }
 }
+
