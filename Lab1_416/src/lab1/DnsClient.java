@@ -1,13 +1,8 @@
 package lab1;
-/**
- * @author michaelrabbat
- * 
- */
-import java.io.*;
+
 import java.net.*;
 import java.util.Arrays;
 import java.util.Random;
-import java.nio.ByteBuffer;
 
 public class DnsClient {
 	
@@ -20,12 +15,11 @@ public class DnsClient {
 		int maxRetry = 3;
 		int atSign = 0;
 		String domainName = "";
-		String queueType = "A"; 			// by default A unless user input something else
+		String queueType = "A"; 									// by default A unless user input something else
 		String IPstring[] = {"","","","",};
-		//int IPadd[] = new int[4];
 		int next = 0;
 	
-		try {
+		try {														// checks for input arguments, outputs error if in wrong format
 			for (int k = 0; k < args.length; k++) {
 				char[] bitsArgs = args[k].toCharArray(); 			
 				for (int m = 0; m < bitsArgs.length; m++) {						
@@ -60,7 +54,7 @@ public class DnsClient {
 				}	
 			}
 				
-				if (atSign == 0) {
+				if (atSign == 0) {								
 					System.out.println("ERROR	IP address is not correct. You are missing an '@'");
 					System.exit(1);
 				}
@@ -84,7 +78,6 @@ public class DnsClient {
 		}
 
 		// Create a UDP socket
-		// (Note, when no port number is specified, the OS will assign an arbitrary one)
 		DatagramSocket clientSocket = new DatagramSocket();
 		
 		
@@ -93,9 +86,7 @@ public class DnsClient {
 		byte[] receiveData = new byte[1024];
 
 		
-		
-		
-		//new changes
+		//IP address parsed from string into byte arrays to be input in getByAddress method
 		int ipEntry [] = new int[4];
 		ipEntry[0] = Integer.parseInt(IPstring[0]);
 		ipEntry[1] = Integer.parseInt(IPstring[1]);
@@ -109,29 +100,18 @@ public class DnsClient {
 		InetAddress IPserver = InetAddress.getByAddress(ipAddress);
 	     //Returns an InetAddress object given the raw IP address . The argument is in network byte order: the highest order byte of the address is in getAddress()[0].
 		
-		//System.out.println("line 50");
 		
-		//second args is domain name
-		
-		//System.out.println("Enter Domain Name");
-		//args[1] = inFromUser.readLine();
-		//System.out.println(args[1]);
-		
-		//String sentence = args[0] + " " + args[1];
-
-		
-		//sendData = sentence.getBytes();
-		sendData = packetHeader(domainName,queueType);
+		sendData = packet(domainName,queueType);
 		
 		
 		// Create a UDP packet to be sent to the server
-		// This involves specifying the sender's address and port number
+		// This involves specifying the server's address and port number
 		//DatagramPacket(byte[] data to send,array data length,IPaddress,port number)
 		DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, IPserver, port);
 		
-		
 		// Send the packet
 		clientSocket.send(sendPacket);
+		
 		// timer start after sending data and retry tracker
 		long startTime = System.nanoTime();
 		int retry = 0;
@@ -139,24 +119,19 @@ public class DnsClient {
 		//if time to response exceeds timeout, will enter if statement and resend data
 		if((System.nanoTime()-startTime)/1000000000 >= timeOut) {		
 			retry++;
-			sendData = packetHeader(domainName,queueType);
+			sendData = packet(domainName,queueType);
 			System.out.println("timeout");
 			System.out.println(startTime);
 					
 		}
-		System.out.println(59);
-		
-		
-		
 		
 		// Create a packet structure to store data sent back by the server
 		DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
-		System.out.println(62);
+
 		// Receive data from the server
 		clientSocket.receive(receivePacket);
 		
 		String ansRecords = answerRecords(receiveData); 
-		System.out.println(ansRecords);
 		
 		String finaldata = Arrays.toString(receiveData);
 		System.out.println(finaldata);
@@ -184,6 +159,9 @@ public class DnsClient {
 		
 		System.out.println("\n"+ "Response received after " + ((long)(endTime - startTime))/1000 + " seconds" +" ("+retry +") retries");
 		
+		System.out.println("\n" + "***Answer Section ("+ansRecords +" records)***");
+		
+		//System.out.println("IP" + "\t" +); //need to add IP adress from packet
 
 		
 		// Close the socket
@@ -211,37 +189,20 @@ public class DnsClient {
 		return IPbyte;
 	}
 	
-	// have to create methods that will call create a packet header
-	public static byte[] packetHeader(String  domainName, String qtype) {
-		
-		// DNS PACKET HEADER for query
-				/* 
-				      ID 		16 bits 	random                         
-				      QR 		1 bit 		0(query) or 1(response) 
-				      Opcode  	4 bits		0 
-				      AA		1 bit		0 or 1 (non or authoritative response) (only meaningful in response)
-				      TC		1 bit		0 i think
-				      RD		1 bit		1
-				      RA   		1 bit		0
-				      Z     	3 bits		0.
-				      RCODE   	4 bits		0. ** Implement all 5 kinds** (only meaningful in response)
-				      QDCOUNT  	16 bits		1                  
-				      ANCOUNT	16 bits 	0                    
-				      NSCOUNT   16 bits		0 ignore                 
-				      ARCOUNT   16 bits     0   */   
-				// ID
+	//method to create a DNS packet
+	public static byte[] packet(String  domainName, String qtype) {
 		
 		
-		byte[] pack = new byte[512];	//creates space in byte packfer for 512 byte[] array
+		byte[] pack = new byte[512];	//creates space in byte buffer for 512 byte[] array
 
-		//ID field contains 2 bytes
+		//DNS Packet Header
+		//ID field contains 2 bytes,generates 2 random byte to fill ID field
 		byte[] ID = new byte[2];				
 		new Random().nextBytes(ID);
+		
 		// ID field = xxxxxxxx xxxxxxxx - in 2 bytes
 		pack[0] = ID[0];
-		//System.out.println(ID[0] + "ID1"); 
 		pack[1] = ID[1];
-		//System.out.println(ID[1] + "ID2"); 
 		
 		////QR OPcode AA TC RD = line2_1 = 1 -- 00000001 - in byte   00000x00
 		byte line2_1 = 1;
@@ -275,35 +236,31 @@ public class DnsClient {
 		
 		
 		
-		
 		// DNS Questions
 		
 		//Qname field 
-		String [] labels = domainName.split("\\.");
+		String [] labels = domainName.split("\\.");					//Splits domain name by "." intervals
 		System.out.println(labels[0]); //www
 		System.out.println(labels[1]); //mcgill
 		System.out.println(labels[2]); //ca
 		
-		int qLocation = 12;    //location of start of qname field
+		int qLocation = 12;    										//location of start of qname field
 		for (int i=0; i<labels.length;i++){
 			pack[qLocation++] = ((byte)labels[i].length());
-			//System.out.println(pack[qLocation]);
 			//System.out.println("outer loop");
 			
 			for (int j=0; j<labels[i].length(); j++){
 				byte domainByte = (byte)labels[i].charAt(j);
 				pack[qLocation++]= domainByte;
 				//System.out.println("inner loop");
-				//System.out.println(pack[qLocation]);
 			}	
 
 		}		
-		System.out.println(qLocation + " nombor berapa");
 		
-		byte endQName = 0;					// marking end of Qname
+		byte endQName = 0;										// marking end of Qname
 		pack [qLocation++] = endQName ;
 		
-		// Qtype
+		// Qtype field
 		byte qtype1 = 0;
 		pack [qLocation++] = qtype1;
 		
@@ -325,13 +282,15 @@ public class DnsClient {
 			
 		}
 		
-		//qclass
+		//Qclass field
 		
 		pack [qLocation++] = 0;
 		pack [qLocation++] = 1;
 		
 		return pack;
 	}
+	
+	
 	public static String dataType(byte [] receive) {
 		int nameStart = 12;
 		String type ="";
@@ -376,7 +335,7 @@ public class DnsClient {
 		cache = ""+TTL[0]+""+TTL[1]+""+TTL[2]+""+TTL[3];
 		return cache;
 	}
-	// have to use bit manipulation techniques to change values
+	
 	public static String autho(byte [] receive) {
 		int authostart = 3;
 		byte x = receive[authostart];
@@ -428,7 +387,4 @@ public class DnsClient {
     	}
     	return binOut;
     }
-		
-	
-	
 }
