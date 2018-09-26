@@ -314,7 +314,6 @@ public class DnsClient {
 			int i =1;
 			while(i<5) {
 				data = data + (0xFF &receive[nameStart]);
-				System.out.println(receive[nameStart]);
 				nameStart++;
 				i++;
 				if(i<5) {
@@ -345,7 +344,6 @@ public class DnsClient {
 			data = name(receive,nameStart);
 			
 		}
-;
 		output[0] = type;
 		output[1] = data;
 		
@@ -386,16 +384,6 @@ public class DnsClient {
 		}
 		return data;
 	}
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
 	
 	public static String cacheTTL(byte [] receive) {
 		int nameStart = 12;
