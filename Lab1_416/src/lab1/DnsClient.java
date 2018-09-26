@@ -8,8 +8,7 @@ public class DnsClient {
 	
 
 	public static void main(String args[]) throws Exception{
-		
-		
+
 		int port = 53;
 		int timeOut = 5;
 		int maxRetry = 3;
@@ -112,10 +111,10 @@ public class DnsClient {
 		// Send the packet
 		clientSocket.send(sendPacket);
 		
-		// timer start after sending data and retry tracker
+		// timer start after sending data and retry tracker doesnt really work
 		long startTime = System.nanoTime();
 		int retry = 0;
-		System.out.println(startTime);
+		//System.out.println(startTime);
 		//if time to response exceeds timeout, will enter if statement and resend data
 		if((System.nanoTime()-startTime)/1000000000 >= timeOut) {		
 			retry++;
@@ -133,20 +132,23 @@ public class DnsClient {
 		
 		String ansRecords = answerRecords(receiveData); 
 		
-		String finaldata = Arrays.toString(receiveData);
-		System.out.println(finaldata);
+		/*
+		 * 
+		 * Uncomment the following string and print statement to see data packet response in printed byte array form
+		 */
+		//String finaldata = Arrays.toString(receiveData);
+		//System.out.println(finaldata);
+		
 		String []data_type = dataType(receiveData);
 		String type = data_type[0];
+
 		String data = data_type[1];
 		
 		String cache = cacheTTL(receiveData);
-		System.out.println(cache);
 		
 		String AA = autho(receiveData);
-		System.out.println(AA);
 		
 		String addRecords = additionalRecords(receiveData); 
-		System.out.println(addRecords);
 		
 		
 		long endTime = System.currentTimeMillis();
@@ -160,38 +162,37 @@ public class DnsClient {
 		
 		System.out.println("\n"+ "Response received after " + ((long)(endTime - startTime))/1000 + " seconds" +" ("+retry +") retries");
 		
+		
+		// follow if statements depends on the type of response received
 		System.out.println("\n" + "***Answer Section ("+ansRecords +" records)***");
 		
 		if(type.equals("A")){		
-			System.out.println("IP" + "\t" +data +"\t" + cache + "\t" +AA); //need to add IP adress from packet
+			System.out.println("IP" + "\t" +data +"\t" + cache+ " seconds" + "\t" +AA); //need to add IP adress from packet
 		}
 		
+		if(type.equals("CNAME")){
+			System.out.println("CNAME" + "\t" +data +"\t" + cache+ " seconds" + "\t" +AA);
+		}
+		
+		if(type.equals("MX")) {
+			System.out.println("MX" + "\t" +data +"\t" + cache+ " seconds" + "\t" +AA);
+		}
+		
+		if(type.equals("NS")) {
+			System.out.println("NS" + "\t" +data +"\t" + cache+ " seconds" + "\t" +AA);
+		}
+		
+		if(addRecords.equals("NOTFOUND")) {
+			System.out.println("\n" + "***Additional Section records***" + "\n" +addRecords );
+		} 
+		else if(!addRecords.equals("NOTFOUND")){
+			System.out.println("\n" + "***Additional Section ("+addRecords +" records)***");
+		}
 		
 		// Close the socket
 		clientSocket.close();
 			}
 		
-	
-	
-	
-	public static byte[] parseIP(String in) {
-		String[] IP = in.split("@"); // to get rid of @ in input
-		
-		int onlyIP = 1;  			//pointer to location of IP without @ in string []
-		System.out.println(IP[onlyIP]);
-		IP = IP[onlyIP].split("\\.");   // splits string by decimal points
-		
-		byte [] IPbyte = new byte[4];	// 4 for size byte addr required for IPv4 addresses
-		int counter = 0;
-		for(String IPs : IP) {
-			IPbyte[counter]=(byte)Integer.parseInt(IPs);
-			//IPbyte[counter]= (byte) (IPbyte[counter] & 0xFF); not necessary here. but necessary when printing later on.
-			// masking with 0xFF is for values over 127
-			counter++;
-		}
-		return IPbyte;
-	}
-	
 	//method to create a DNS packet
 	public static byte[] packet(String  domainName, String qtype) {
 		
@@ -243,9 +244,10 @@ public class DnsClient {
 		
 		//Qname field 
 		String [] labels = domainName.split("\\.");					//Splits domain name by "." intervals
-		System.out.println(labels[0]); //www
-		System.out.println(labels[1]); //mcgill
-		System.out.println(labels[2]); //ca
+		//example domain tested and printed commented out
+		//System.out.println(labels[0]); //www
+		//System.out.println(labels[1]); //mcgill
+		//System.out.println(labels[2]); //ca
 		
 		int qLocation = 12;    										//location of start of qname field
 		for (int i=0; i<labels.length;i++){
@@ -322,22 +324,78 @@ public class DnsClient {
 		}
 		else if((receive[nameStart] == 2)) {
 			type = "NS";
+			nameStart = nameStart+9;
+			data = name(receive,nameStart);
+			
 			
 		}
 		else if((receive[nameStart] == 15)) {
 			type = "MX";
+			String pref = "";
+			nameStart = nameStart+9;		//offset to location of pref
+			pref = "" + (receive[nameStart]&0xFF) +""+(receive[nameStart+1]&0xFF);
+			nameStart = nameStart+2;		// offset to location of exchange
+			data = name(receive,nameStart);
+			data = data + "/t" +pref;
 			
 		}
 		else if((receive[nameStart] == 5)) {
 			type = "CNAME";
+			nameStart = nameStart+9;
+			data = name(receive,nameStart);
 			
 		}
+;
 		output[0] = type;
 		output[1] = data;
 		
-		
 		return output;
 	}
+	
+	//method converts bytes into name
+	public static String name(byte[] receive, int nameStart) {
+		String data = "";
+		while(receive[nameStart]!= 0) {
+			if(receive[nameStart] == -64) {
+				nameStart++;
+				int pointer = receive[nameStart];
+				int size = receive[pointer];
+				for(int i =0; i<size; i++) {
+					pointer++;
+					data = data + (char)receive[pointer];
+				}
+				nameStart++;
+				if(receive[nameStart]!=0) {
+					data = data + ".";
+				}
+
+				
+			}
+			else {
+				int size = receive[nameStart];
+				for(int i = 0; i<size; i++) {
+					nameStart++;
+					data = data + (char)receive[nameStart];
+				}
+				nameStart++;
+				if(receive[nameStart]!=0) {
+					data = data + ".";
+				
+				}
+			}
+		}
+		return data;
+	}
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
 	
 	public static String cacheTTL(byte [] receive) {
 		int nameStart = 12;
@@ -345,13 +403,22 @@ public class DnsClient {
 		while((receive[nameStart] != 0)) {
 			nameStart++;	
 		}
-		nameStart= nameStart +5;   // to get to array with TLL
+		nameStart= nameStart +11;   // to get to array with TLL
 		byte [] TTL = new byte[4];
-		TTL[0] = (byte) (receive[nameStart] & 0xFF);
-		TTL[1] = (byte) (receive[nameStart+1] & 0xFF);
-		TTL[2] = (byte) (receive[nameStart+2] & 0xFF);
-		TTL[3] = (byte) (receive[nameStart+3] & 0xFF);
-		cache = ""+TTL[0]+""+TTL[1]+""+TTL[2]+""+TTL[3];
+		TTL[0] = receive[nameStart];
+		TTL[1] = receive[nameStart+1] ;
+		TTL[2] = receive[nameStart+2] ;
+		TTL[3] = receive[nameStart+3] ;
+		if(TTL[0] == 0 ) {
+			if(TTL[1]==0) {
+				if(TTL[2]==0) {
+					return cache = ""+(0xFF& TTL[3]);
+				}
+				return cache = ""+(0xFF& TTL[2])+""+(0xFF& TTL[3]);
+			}
+			return cache = ""+(0xFF& TTL[1])+""+(0xFF& TTL[2])+""+(0xFF& TTL[3]);
+		}
+		cache = ""+(0xFF& TTL[0])+""+(0xFF& TTL[1])+""+(0xFF& TTL[2])+""+(0xFF& TTL[3]);
 		return cache;
 	}
 	
@@ -407,4 +474,5 @@ public class DnsClient {
     	return binOut;
     }
 }
+
 
