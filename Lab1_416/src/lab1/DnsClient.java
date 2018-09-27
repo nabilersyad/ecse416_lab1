@@ -10,7 +10,7 @@ public class DnsClient {
 	public static void main(String args[]) throws Exception{
 
 		int port = 53;
-		int timeOut = 5;
+		int timeOut = 2;
 		int maxRetry = 3;
 		int atSign = 0;
 		String domainName = "";
@@ -102,6 +102,11 @@ public class DnsClient {
 		
 		sendData = packet(domainName,queueType);
 		
+		//Print Statements of what data is sent
+		System.out.println("Dns client sending request for "+ domainName);
+		System.out.println("Server: " + IPstring[0]+"." +IPstring[1]+"." +IPstring[2]+"."+IPstring[3]);
+		System.out.println("Request Type: " + queueType);
+		
 		
 		// Create a UDP packet to be sent to the server
 		// This involves specifying the server's address and port number
@@ -113,23 +118,34 @@ public class DnsClient {
 		
 		// timer start after sending data and retry tracker doesnt really work
 		long startTime = System.nanoTime();
-		int retry = 0;
 		//System.out.println(startTime);
 		//if time to response exceeds timeout, will enter if statement and resend data
-		if((System.nanoTime()-startTime)/1000000000 >= timeOut) {		
-			retry++;
-			sendData = packet(domainName,queueType);
-			System.out.println("timeout");
-			System.out.println(startTime);
-					
-		}
 		
 		// Create a packet structure to store data sent back by the server
 		DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
-
-		// Receive data from the server
-		clientSocket.receive(receivePacket);
 		
+		//retry if timeout
+		int retry = 0;
+		clientSocket.setSoTimeout(timeOut*1000);
+		while(retry<=maxRetry) {
+			try {
+				clientSocket.receive(receivePacket);
+				break;
+			}
+			catch(SocketTimeoutException e) {
+				retry++;
+			}
+		}
+		
+		if(retry>maxRetry) {
+			maxRetriesError(maxRetry);
+		}
+		
+
+		
+		// Receive data from the server
+		//clientSocket.receive(receivePacket);
+		long endTime = System.nanoTime();
 		String ansRecords = answerRecords(receiveData); 
 		
 		/*
@@ -150,17 +166,7 @@ public class DnsClient {
 		
 		String addRecords = additionalRecords(receiveData); 
 		
-		
-		long endTime = System.currentTimeMillis();
-		startTime = startTime/1000;
-		endTime = endTime/1000;
-	
-		
-		System.out.println("Dns client sending request for "+ domainName);
-		System.out.println("Server: " + IPstring[0]+"." +IPstring[1]+"." +IPstring[2]+"."+IPstring[3]);
-		System.out.println("Request Type: " + queueType);
-		
-		System.out.println("\n"+ "Response received after " + ((long)(endTime - startTime))/1000 + " seconds" +" ("+retry +") retries");
+		System.out.println("\n"+ "Response received after " + ((long)(endTime - startTime))/1000000 + " microseconds" +" ("+retry +") retries");
 		
 		
 		// follow if statements depends on the type of response received
@@ -192,6 +198,7 @@ public class DnsClient {
 		// Close the socket
 		clientSocket.close();
 			}
+
 		
 	//method to create a DNS packet
 	public static byte[] packet(String  domainName, String qtype) {
@@ -353,6 +360,9 @@ public class DnsClient {
 	//method converts bytes into name
 	public static String name(byte[] receive, int nameStart) {
 		String data = "";
+		
+		
+		
 		while(receive[nameStart]!= 0) {
 			if(receive[nameStart] == -64) {
 				nameStart++;
@@ -461,6 +471,11 @@ public class DnsClient {
     	}
     	return binOut;
     }
+	//method to allow exception to be thrown if max retries done
+	private static void maxRetriesError(int x) throws SocketTimeoutException {
+		throw new SocketTimeoutException ("ERROR" +"\t"+ "Maximum number of retries [" + x +"] exceeded");
+	}
 }
+
 
 
